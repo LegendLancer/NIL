@@ -919,7 +919,7 @@ contract NIL is Context, IERC20, Ownable {
     address[] private _excluded;
 
     uint256 private constant MAX = ~uint256(0);
-    uint256 private _tTotal = 1000000000 * 10**6 * 10**8;
+    uint256 private _tTotal = 1000000000 * 10**3 * 10**8;
     uint256 private _rTotal = (MAX - (MAX % _tTotal));
     uint256 private _tFeeTotal;
 
@@ -942,8 +942,8 @@ contract NIL is Context, IERC20, Ownable {
     bool inSwapAndLiquify;
     bool public swapAndLiquifyEnabled = true;
 
-    uint256 public _maxTxAmount = 5000000 * 10**6 * 10**8;
-    uint256 private numTokensSellToAddToLiquidity = 500000 * 10**6 * 10**8;
+    uint256 public _maxTxAmount = 2000000 * 10**3 * 10**8;
+    uint256 private numTokensSellToAddToLiquidity = 300000 * 10**3 * 10**8;
 
     event MinTokensBeforeSwapUpdated(uint256 minTokensBeforeSwap);
     event SwapAndLiquifyEnabledUpdated(bool enabled);
@@ -1180,6 +1180,10 @@ contract NIL is Context, IERC20, Ownable {
 
     function setLiquidityFeePercent(uint256 liquidityFee) external onlyOwner {
         _liquidityFee = liquidityFee;
+    }
+
+    function setBurnFeePercent(uint256 burnFee) external onlyOwner {
+        _burnFee = burnFee;
     }
 
     function setMaxTxPercent(uint256 maxTxPercent) external onlyOwner {
@@ -1468,7 +1472,7 @@ contract NIL is Context, IERC20, Ownable {
         } else if (_isExcluded[sender] && _isExcluded[recipient]) {
             _transferBothExcluded(sender, recipient, amount.sub(burnAmt));
         } else {
-            _transferStandard(sender, recipient, .subamount(burnAmt));
+            _transferStandard(sender, recipient, amount.sub(burnAmt));
         }
 
         // burn tokens by sending to address 0x0
