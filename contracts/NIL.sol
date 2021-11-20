@@ -4,7 +4,7 @@
 
 /**                                                                                
 _________________________________
-|    _  _      _ _      _       |
+|   __  __    _____    ___      |
 |   | \| |    |_ _|    | |      |
 |   | .` |     | |     | |__    |
 |   |_|\_|    |___|    |____|   |
@@ -15,7 +15,11 @@ _________________________________
 
  */
 
-pragma solidity ^0.6.12;
+/**
+ *Submitted for verification at Etherscan.io on 2021-11-xx
+ */
+
+pragma solidity ^0.8.9;
 
 // SPDX-License-Identifier: Unlicensed
 interface IERC20 {
@@ -269,7 +273,8 @@ library SafeMath {
 }
 
 abstract contract Context {
-    function _msgSender() internal view virtual returns (address payable) {
+    //function _msgSender() internal view virtual returns (address payable) {
+    function _msgSender() internal view virtual returns (address) {
         return msg.sender;
     }
 
@@ -482,7 +487,7 @@ contract Ownable is Context {
     /**
      * @dev Initializes the contract setting the deployer as the initial owner.
      */
-    constructor() internal {
+    constructor() {
         address msgSender = _msgSender();
         _owner = msgSender;
         emit OwnershipTransferred(address(0), msgSender);
@@ -536,7 +541,7 @@ contract Ownable is Context {
     function lock(uint256 time) public virtual onlyOwner {
         _previousOwner = _owner;
         _owner = address(0);
-        _lockTime = now + time;
+        _lockTime = block.timestamp + time;
         emit OwnershipTransferred(_owner, address(0));
     }
 
@@ -546,13 +551,11 @@ contract Ownable is Context {
             _previousOwner == msg.sender,
             "You don't have permission to unlock"
         );
-        require(now > _lockTime, "Contract is locked until 7 days");
+        require(block.timestamp > _lockTime, "Contract is locked until 7 days");
         emit OwnershipTransferred(_owner, _previousOwner);
         _owner = _previousOwner;
     }
 }
-
-// pragma solidity >=0.5.0;
 
 interface IUniswapV2Factory {
     event PairCreated(
@@ -583,8 +586,6 @@ interface IUniswapV2Factory {
 
     function setFeeToSetter(address) external;
 }
-
-// pragma solidity >=0.5.0;
 
 interface IUniswapV2Pair {
     event Approval(
@@ -694,8 +695,6 @@ interface IUniswapV2Pair {
 
     function initialize(address, address) external;
 }
-
-// pragma solidity >=0.6.2;
 
 interface IUniswapV2Router01 {
     function factory() external pure returns (address);
@@ -856,8 +855,6 @@ interface IUniswapV2Router01 {
         returns (uint256[] memory amounts);
 }
 
-// pragma solidity >=0.6.2;
-
 interface IUniswapV2Router02 is IUniswapV2Router01 {
     function removeLiquidityETHSupportingFeeOnTransferTokens(
         address token,
@@ -905,7 +902,11 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
     ) external;
 }
 
-contract NIL is Context, IERC20, Ownable {
+interface IAirdrop {
+    function airdrop(address recipient, uint256 amount) external;
+}
+
+contract Shibnobi is Context, IERC20, Ownable {
     using SafeMath for uint256;
     using Address for address;
 
@@ -918,10 +919,20 @@ contract NIL is Context, IERC20, Ownable {
     mapping(address => bool) private _isExcluded;
     address[] private _excluded;
 
+    mapping(address => bool) private botWallets;
+
+    mapping(address => bool) public whitelist;
+
+    bool botscantrade = false;
+
+    bool public canTrade = false;
+
     uint256 private constant MAX = ~uint256(0);
-    uint256 private _tTotal = 1000000000 * 10**3 * 10**8;
+    uint256 private _tTotal = 1000000000 * 10**3 * 10**9;
     uint256 private _rTotal = (MAX - (MAX % _tTotal));
     uint256 private _tFeeTotal;
+
+    address public burnAddress = 0x000000000000000000000000000000000000dEaD;
 
     string private _name = "NIL";
     string private _symbol = "NIL";
@@ -930,11 +941,11 @@ contract NIL is Context, IERC20, Ownable {
     uint256 public _taxFee = 5;
     uint256 private _previousTaxFee = _taxFee;
 
-    uint256 public _liquidityFee = 5;
-    uint256 private _previousLiquidityFee = _liquidityFee;
-
     uint256 public _burnFee = 5;
     uint256 private _previousBurnFee = _burnFee;
+
+    uint256 public _liquidityFee = 5; // including burn fee
+    uint256 private _previousLiquidityFee = _liquidityFee;
 
     IUniswapV2Router02 public immutable uniswapV2Router;
     address public immutable uniswapV2Pair;
@@ -942,8 +953,8 @@ contract NIL is Context, IERC20, Ownable {
     bool inSwapAndLiquify;
     bool public swapAndLiquifyEnabled = true;
 
-    uint256 public _maxTxAmount = 2000000 * 10**3 * 10**8;
-    uint256 private numTokensSellToAddToLiquidity = 300000 * 10**3 * 10**8;
+    uint256 public _maxTxAmount = 2000000 * 10**3 * 10**9;
+    uint256 public numTokensSellToAddToLiquidity = 1000000 * 10**3 * 10**9;
 
     event MinTokensBeforeSwapUpdated(uint256 minTokensBeforeSwap);
     event SwapAndLiquifyEnabledUpdated(bool enabled);
@@ -959,12 +970,14 @@ contract NIL is Context, IERC20, Ownable {
         inSwapAndLiquify = false;
     }
 
-    constructor() public {
+    constructor() {
         _rOwned[_msgSender()] = _rTotal;
 
+        //IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E); //Mainnet BSC
+        //IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3); //Testnet BSC
         IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(
             0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
-        );
+        ); //Mainnet & Testnet ETH
         // Create a uniswap pair for this new token
         uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
             .createPair(address(this), _uniswapV2Router.WETH());
@@ -975,6 +988,9 @@ contract NIL is Context, IERC20, Ownable {
         //exclude owner and this contract from fee
         _isExcludedFromFee[owner()] = true;
         _isExcludedFromFee[address(this)] = true;
+
+        //include owner to whitelist
+        whitelist[owner()] = true;
 
         emit Transfer(address(0), _msgSender(), _tTotal);
     }
@@ -1081,6 +1097,30 @@ contract NIL is Context, IERC20, Ownable {
         return _tFeeTotal;
     }
 
+    function airdrop(address recipient, uint256 amount) external onlyOwner {
+        removeAllFee();
+        _transfer(_msgSender(), recipient, amount * 10**9);
+        restoreAllFee();
+    }
+
+    function airdropInternal(address recipient, uint256 amount) internal {
+        removeAllFee();
+        _transfer(_msgSender(), recipient, amount);
+        restoreAllFee();
+    }
+
+    function airdropArray(
+        address[] calldata newholders,
+        uint256[] calldata amounts
+    ) external onlyOwner {
+        uint256 iterator = 0;
+        require(newholders.length == amounts.length, "must be the same length");
+        while (iterator < newholders.length) {
+            airdropInternal(newholders[iterator], amounts[iterator] * 10**9);
+            iterator += 1;
+        }
+    }
+
     function deliver(uint256 tAmount) public {
         address sender = _msgSender();
         require(
@@ -1166,6 +1206,14 @@ contract NIL is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, tTransferAmount);
     }
 
+    function includeInWhitelist(address account) external onlyOwner {
+        whitelist[account] = true;
+    }
+
+    function excludeFromWhitelist(address account) external onlyOwner {
+        whitelist[account] = false;
+    }
+
     function excludeFromFee(address account) public onlyOwner {
         _isExcludedFromFee[account] = true;
     }
@@ -1174,7 +1222,17 @@ contract NIL is Context, IERC20, Ownable {
         _isExcludedFromFee[account] = false;
     }
 
+    function setBurnFeePercent(uint256 fee) public onlyOwner {
+        require(fee < 20, "Burn fee cannot be more than 20% of tx amount");
+        _burnFee = fee;
+    }
+
+    function setBurnAddress(address walletAddress) public onlyOwner {
+        burnAddress = walletAddress;
+    }
+
     function setTaxFeePercent(uint256 taxFee) external onlyOwner {
+        require(taxFee < 20, "Tax fee cannot be more than 20%");
         _taxFee = taxFee;
     }
 
@@ -1182,12 +1240,61 @@ contract NIL is Context, IERC20, Ownable {
         _liquidityFee = liquidityFee;
     }
 
-    function setBurnFeePercent(uint256 burnFee) external onlyOwner {
-        _burnFee = burnFee;
+    function setMaxTxAmount(uint256 maxTxAmount) external onlyOwner {
+        require(
+            maxTxAmount > 10000000,
+            "Max Tx Amount cannot be less than 10,000,000"
+        );
+        _maxTxAmount = maxTxAmount * 10**9;
     }
 
-    function setMaxTxPercent(uint256 maxTxPercent) external onlyOwner {
-        _maxTxAmount = _tTotal.mul(maxTxPercent).div(10**2);
+    function setSwapThresholdAmount(uint256 SwapThresholdAmount)
+        external
+        onlyOwner
+    {
+        require(
+            SwapThresholdAmount > 1000000000,
+            "Swap Threshold Amount cannot be less than 1,000,000,000"
+        );
+        numTokensSellToAddToLiquidity = SwapThresholdAmount * 10**9;
+    }
+
+    function claimTokens(address walletAddress) public onlyOwner {
+        // make sure we capture all ETH that may or may not be sent to this contract
+        payable(walletAddress).transfer(address(this).balance);
+    }
+
+    function claimOtherTokens(IERC20 tokenAddress, address walletaddress)
+        external
+        onlyOwner
+    {
+        tokenAddress.transfer(
+            walletaddress,
+            tokenAddress.balanceOf(address(this))
+        );
+    }
+
+    function clearStuckBalance(address payable walletaddress)
+        external
+        onlyOwner
+    {
+        walletaddress.transfer(address(this).balance);
+    }
+
+    function addBotWallet(address botwallet) external onlyOwner {
+        botWallets[botwallet] = true;
+    }
+
+    function removeBotWallet(address botwallet) external onlyOwner {
+        botWallets[botwallet] = false;
+    }
+
+    function getBotWalletStatus(address botwallet) public view returns (bool) {
+        return botWallets[botwallet];
+    }
+
+    function allowtrading() external onlyOwner {
+        canTrade = true;
     }
 
     function setSwapAndLiquifyEnabled(bool _enabled) public onlyOwner {
@@ -1309,7 +1416,7 @@ contract NIL is Context, IERC20, Ownable {
         view
         returns (uint256)
     {
-        return _amount.mul(_liquidityFee).div(10**2);
+        return _amount.mul(_liquidityFee + _burnFee).div(10**2);
     }
 
     function removeAllFee() private {
@@ -1396,9 +1503,21 @@ contract NIL is Context, IERC20, Ownable {
     }
 
     function swapAndLiquify(uint256 contractTokenBalance) private lockTheSwap {
-        // split the contract balance into halves
-        uint256 half = contractTokenBalance.div(2);
-        uint256 otherHalf = contractTokenBalance.sub(half);
+        // split the contract balance to burnAmt and liquifyAmt
+        uint256 totalFee = _liquidityFee + _burnFee;
+        uint256 burnAmt = contractTokenBalance.mul(_burnFee).div(totalFee);
+        uint256 liquifyAmt = contractTokenBalance.sub(burnAmt);
+
+        // transfer burnAmt to burnAddress
+        if (burnAmt > 0) {
+            removeAllFee();
+            _transferStandard(address(this), burnAddress, burnAmt);
+            restoreAllFee();
+        }
+
+        // split the liquify balance into halves
+        uint256 half = liquifyAmt.div(2);
+        uint256 otherHalf = liquifyAmt.sub(half);
 
         // capture the contract's current ETH balance.
         // this is so that we can capture exactly the amount of ETH that the
@@ -1458,29 +1577,30 @@ contract NIL is Context, IERC20, Ownable {
         uint256 amount,
         bool takeFee
     ) private {
+        if (!canTrade) {
+            // only whitelisted accounts buy or sender can trade
+            if (!(sender == uniswapV2Pair && whitelist[recipient])) {
+                require(sender == owner());
+            }
+        }
+
+        if (botWallets[sender] || botWallets[recipient]) {
+            require(botscantrade, "bots arent allowed to trade");
+        }
+
         if (!takeFee) removeAllFee();
 
-        // calculate how much amount should be burned
-        uint256 burnAmt = amount.mul(_burnFee).div(100);
-
         if (_isExcluded[sender] && !_isExcluded[recipient]) {
-            _transferFromExcluded(sender, recipient, amount.sub(burnAmt));
+            _transferFromExcluded(sender, recipient, amount);
         } else if (!_isExcluded[sender] && _isExcluded[recipient]) {
-            _transferToExcluded(sender, recipient, amount.sub(burnAmt));
+            _transferToExcluded(sender, recipient, amount);
         } else if (!_isExcluded[sender] && !_isExcluded[recipient]) {
-            _transferStandard(sender, recipient, amount.sub(burnAmt));
+            _transferStandard(sender, recipient, amount);
         } else if (_isExcluded[sender] && _isExcluded[recipient]) {
-            _transferBothExcluded(sender, recipient, amount.sub(burnAmt));
+            _transferBothExcluded(sender, recipient, amount);
         } else {
-            _transferStandard(sender, recipient, amount.sub(burnAmt));
+            _transferStandard(sender, recipient, amount);
         }
-
-        // burn tokens by sending to address 0x0
-        removeAllFee();
-        if (burnAmt > 0) {
-            _transferStandard(sender, address(0), burnAmt);
-        }
-        restoreAllFee();
 
         if (!takeFee) restoreAllFee();
     }
