@@ -1,5 +1,5 @@
 /**
- *Submitted for verification at BscScan.com on 2021-11-xx
+ *Submitted for verification at Etherscan.io on 2021-11-21
  */
 
 /**                                                                                
@@ -16,7 +16,7 @@ _________________________________
  */
 
 /**
- *Submitted for verification at Etherscan.io on 2021-11-xx
+ *Submitted for verification at Etherscan.io on 2021-11-21
  */
 
 pragma solidity ^0.8.9;
