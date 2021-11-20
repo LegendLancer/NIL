@@ -906,7 +906,7 @@ interface IAirdrop {
     function airdrop(address recipient, uint256 amount) external;
 }
 
-contract Shibnobi is Context, IERC20, Ownable {
+contract NIL is Context, IERC20, Ownable {
     using SafeMath for uint256;
     using Address for address;
 
