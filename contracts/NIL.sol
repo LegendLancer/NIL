@@ -1,5 +1,9 @@
 /**
- *Submitted for verification at Etherscan.io on 2021-11-21
+ *Submitted for verification at Etherscan.io on 2021-11-25
+*/
+
+/**
+ *Submitted for verification at Etherscan.io on 2021-11-24
  */
 
 /**                                                                                
@@ -11,12 +15,10 @@ _________________________________
 |_||"""""""|_|"""""|_|"""""""||_|
 |_______________________________|
 
-  Github:  https://github.com/legendlancer/NIL 
-
  */
 
 /**
- *Submitted for verification at Etherscan.io on 2021-11-21
+ *Submitted for verification at Etherscan.io on 2021-11-24
  */
 
 pragma solidity ^0.8.9;
@@ -916,15 +918,14 @@ contract NIL is Context, IERC20, Ownable {
 
     mapping(address => bool) private _isExcludedFromFee;
 
+    mapping(address => uint256) private lockedAmount;
+    mapping(address => uint256) private lockedTime;
+    mapping(address => string) private lockedReason;
+
     mapping(address => bool) private _isExcluded;
     address[] private _excluded;
 
-    mapping(address => bool) private botWallets;
-
     mapping(address => bool) public whitelist;
-
-    bool botscantrade = false;
-
     bool public canTrade = false;
 
     uint256 private constant MAX = ~uint256(0);
@@ -933,24 +934,28 @@ contract NIL is Context, IERC20, Ownable {
     uint256 private _tFeeTotal;
 
     address public burnAddress = 0x000000000000000000000000000000000000dEaD;
+    address public marketingWallet = 0x51049066d8ce32D647c6e5E5a92E037040a7f70D;
 
-    string private _name = "NIL";
+    string private _name = "NIL Coin";
     string private _symbol = "NIL";
     uint8 private _decimals = 8;
 
     uint256 public _taxFee = 5;
     uint256 private _previousTaxFee = _taxFee;
 
-    uint256 public _burnFee = 5;
+    uint256 public _burnFee = 2;
     uint256 private _previousBurnFee = _burnFee;
 
-    uint256 public _liquidityFee = 5; // including burn fee
+    uint256 public _liquidityFee = 5;
     uint256 private _previousLiquidityFee = _liquidityFee;
+
+    uint256 public _marketingFee = 3;
+    uint256 private _previousMarketingFee = _marketingFee;
 
     IUniswapV2Router02 public immutable uniswapV2Router;
     address public immutable uniswapV2Pair;
 
-    bool inSwapAndLiquify;
+    bool internal inSwapAndLiquify;
     bool public swapAndLiquifyEnabled = true;
 
     uint256 public _maxTxAmount = 2000000 * 10**3 * 10**8;
@@ -988,9 +993,6 @@ contract NIL is Context, IERC20, Ownable {
         //exclude owner and this contract from fee
         _isExcludedFromFee[owner()] = true;
         _isExcludedFromFee[address(this)] = true;
-
-        //include owner to whitelist
-        whitelist[owner()] = true;
 
         emit Transfer(address(0), _msgSender(), _tTotal);
     }
@@ -1099,7 +1101,7 @@ contract NIL is Context, IERC20, Ownable {
 
     function airdrop(address recipient, uint256 amount) external onlyOwner {
         removeAllFee();
-        _transfer(_msgSender(), recipient, amount * 10**9);
+        _transfer(_msgSender(), recipient, amount * 10**8);
         restoreAllFee();
     }
 
@@ -1116,7 +1118,7 @@ contract NIL is Context, IERC20, Ownable {
         uint256 iterator = 0;
         require(newholders.length == amounts.length, "must be the same length");
         while (iterator < newholders.length) {
-            airdropInternal(newholders[iterator], amounts[iterator] * 10**9);
+            airdropInternal(newholders[iterator], amounts[iterator] * 10**8);
             iterator += 1;
         }
     }
@@ -1208,10 +1210,12 @@ contract NIL is Context, IERC20, Ownable {
 
     function includeInWhitelist(address account) external onlyOwner {
         whitelist[account] = true;
+        _isExcludedFromFee[account] = true;
     }
 
     function excludeFromWhitelist(address account) external onlyOwner {
         whitelist[account] = false;
+        _isExcludedFromFee[account] = false;
     }
 
     function excludeFromFee(address account) public onlyOwner {
@@ -1227,10 +1231,6 @@ contract NIL is Context, IERC20, Ownable {
         _burnFee = fee;
     }
 
-    function setBurnAddress(address walletAddress) public onlyOwner {
-        burnAddress = walletAddress;
-    }
-
     function setTaxFeePercent(uint256 taxFee) external onlyOwner {
         require(taxFee < 20, "Tax fee cannot be more than 20%");
         _taxFee = taxFee;
@@ -1242,10 +1242,14 @@ contract NIL is Context, IERC20, Ownable {
 
     function setMaxTxAmount(uint256 maxTxAmount) external onlyOwner {
         require(
-            maxTxAmount > 10000000,
-            "Max Tx Amount cannot be less than 10,000,000"
+            maxTxAmount > 0,
+            "Max Tx Amount cannot be less than 0"
         );
-        _maxTxAmount = maxTxAmount * 10**9;
+        _maxTxAmount = maxTxAmount * 10**8;
+    }
+
+    function setMarketingFeePercent(uint256 marketingFee) external onlyOwner {
+        _marketingFee = marketingFee;
     }
 
     function setSwapThresholdAmount(uint256 SwapThresholdAmount)
@@ -1253,15 +1257,18 @@ contract NIL is Context, IERC20, Ownable {
         onlyOwner
     {
         require(
-            SwapThresholdAmount > 1000000000,
-            "Swap Threshold Amount cannot be less than 1,000,000,000"
+            SwapThresholdAmount > 0,
+            "Swap Threshold Amount cannot be less than 0"
         );
-        numTokensSellToAddToLiquidity = SwapThresholdAmount * 10**9;
+        numTokensSellToAddToLiquidity = SwapThresholdAmount * 10**8;
     }
 
-    function claimTokens(address walletAddress) public onlyOwner {
-        // make sure we capture all ETH that may or may not be sent to this contract
-        payable(walletAddress).transfer(address(this).balance);
+    function setMarketingWallet(address marketingAddress)
+        external
+        onlyOwner
+    {
+        require(marketingAddress != address(0), "Marketing Address cannot be zero address");
+        marketingWallet = marketingAddress;
     }
 
     function claimOtherTokens(IERC20 tokenAddress, address walletaddress)
@@ -1279,18 +1286,6 @@ contract NIL is Context, IERC20, Ownable {
         onlyOwner
     {
         walletaddress.transfer(address(this).balance);
-    }
-
-    function addBotWallet(address botwallet) external onlyOwner {
-        botWallets[botwallet] = true;
-    }
-
-    function removeBotWallet(address botwallet) external onlyOwner {
-        botWallets[botwallet] = false;
-    }
-
-    function getBotWalletStatus(address botwallet) public view returns (bool) {
-        return botWallets[botwallet];
     }
 
     function allowtrading() external onlyOwner {
@@ -1416,25 +1411,28 @@ contract NIL is Context, IERC20, Ownable {
         view
         returns (uint256)
     {
-        return _amount.mul(_liquidityFee + _burnFee).div(10**2);
+        return _amount.mul(_liquidityFee + _burnFee + _marketingFee).div(10**2);
     }
 
     function removeAllFee() private {
-        if (_taxFee == 0 && _liquidityFee == 0 && _burnFee == 0) return;
+        if (_taxFee == 0 && _liquidityFee == 0 && _burnFee == 0 && _marketingFee == 0) return;
 
         _previousTaxFee = _taxFee;
         _previousLiquidityFee = _liquidityFee;
         _previousBurnFee = _burnFee;
+        _previousMarketingFee = _marketingFee;
 
         _taxFee = 0;
         _liquidityFee = 0;
         _burnFee = 0;
+        _marketingFee = 0;
     }
 
     function restoreAllFee() private {
         _taxFee = _previousTaxFee;
         _liquidityFee = _previousLiquidityFee;
         _burnFee = _previousBurnFee;
+        _marketingFee = _previousMarketingFee;
     }
 
     function isExcludedFromFee(address account) public view returns (bool) {
@@ -1461,7 +1459,7 @@ contract NIL is Context, IERC20, Ownable {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
-        if (from != owner() && to != owner())
+        if (from != owner() && to != owner() && from != uniswapV2Pair)
             require(
                 amount <= _maxTxAmount,
                 "Transfer amount exceeds the maxTxAmount."
@@ -1504,21 +1502,16 @@ contract NIL is Context, IERC20, Ownable {
 
     function swapAndLiquify(uint256 contractTokenBalance) private lockTheSwap {
         // split the contract balance to burnAmt and liquifyAmt
-        uint256 totalFee = _liquidityFee + _burnFee;
+        uint256 totalFee = _liquidityFee + _burnFee + _marketingFee;
         uint256 burnAmt = contractTokenBalance.mul(_burnFee).div(totalFee);
-        uint256 liquifyAmt = contractTokenBalance.sub(burnAmt);
-
+        uint256 liquifyAmt = contractTokenBalance.mul(_liquidityFee).div(totalFee).div(2);
+        uint256 swapForEthAmt = contractTokenBalance.sub(burnAmt).sub(liquifyAmt);
         // transfer burnAmt to burnAddress
         if (burnAmt > 0) {
             removeAllFee();
             _transferStandard(address(this), burnAddress, burnAmt);
             restoreAllFee();
         }
-
-        // split the liquify balance into halves
-        uint256 half = liquifyAmt.div(2);
-        uint256 otherHalf = liquifyAmt.sub(half);
-
         // capture the contract's current ETH balance.
         // this is so that we can capture exactly the amount of ETH that the
         // swap creates, and not make the liquidity event include any ETH that
@@ -1526,15 +1519,20 @@ contract NIL is Context, IERC20, Ownable {
         uint256 initialBalance = address(this).balance;
 
         // swap tokens for ETH
-        swapTokensForEth(half); // <- this breaks the ETH -> HATE swap when swap+liquify is triggered
+        swapTokensForEth(swapForEthAmt); // <- this breaks the ETH -> HATE swap when swap+liquify is triggered
 
         // how much ETH did we just swap into?
         uint256 newBalance = address(this).balance.sub(initialBalance);
+        uint256 marketingBalance = newBalance.mul(_marketingFee * 10).div(_marketingFee * 10 + _liquidityFee * 10 / 2);
+        uint256 liquifyBalance = newBalance.sub(marketingBalance);
 
         // add liquidity to uniswap
-        addLiquidity(otherHalf, newBalance);
+        addLiquidity(liquifyAmt, liquifyBalance);
+        
+        // send to marketing wallet
+        payable(marketingWallet).transfer(marketingBalance);
 
-        emit SwapAndLiquify(half, newBalance, otherHalf);
+        emit SwapAndLiquify(liquifyAmt, liquifyBalance, swapForEthAmt);
     }
 
     function swapTokensForEth(uint256 tokenAmount) private {
@@ -1579,13 +1577,9 @@ contract NIL is Context, IERC20, Ownable {
     ) private {
         if (!canTrade) {
             // only whitelisted accounts buy or sender can trade
-            if (!(sender == uniswapV2Pair && whitelist[recipient])) {
+            if (!(whitelist[sender] || whitelist[recipient])) {
                 require(sender == owner());
             }
-        }
-
-        if (botWallets[sender] || botWallets[recipient]) {
-            require(botscantrade, "bots arent allowed to trade");
         }
 
         if (!takeFee) removeAllFee();
@@ -1665,5 +1659,60 @@ contract NIL is Context, IERC20, Ownable {
         _takeLiquidity(tLiquidity);
         _reflectFee(rFee, tFee);
         emit Transfer(sender, recipient, tTransferAmount);
+    }
+
+    modifier lockPossible(address target, uint256 value) {
+        require(balanceOf(target) >= value, 'Nil: the lock amount exceeds balance');
+        _;
+    }
+
+    modifier transactionPossible(address sender, uint256 value) {
+        uint256 locked;
+        if(block.timestamp < lockedTime[sender]) {
+            if(balanceOf(sender) > lockedAmount[sender])
+                locked = balanceOf(sender) - lockedAmount[sender];
+            else
+                locked = 0;
+        }
+        else
+            locked = balanceOf(sender);
+        require(locked >= value, 'Nil: the transfer amount exceeds unlocked amount');
+        _;
+    }
+
+    function timeLockAddress(address target, uint256 amount, string memory reason, uint256 duration) external onlyOwner lockPossible(target, amount) returns (bool) {
+        lockedAmount[target] = amount;
+        lockedReason[target] = reason;
+        lockedTime[target] = block.timestamp + duration * 1 days;
+        return true;
+    }
+
+    function timeUnlockAddress(address target) external onlyOwner returns (bool) {
+        lockedAmount[target] = 0;
+        lockedReason[target] = '';
+        lockedTime[target] = block.timestamp;
+        return true;
+    }
+
+    function updateLockedAmount(address target, uint256 amount) external onlyOwner lockPossible(target, amount) returns (bool) {
+        lockedAmount[target] = amount;
+        return true;
+    }
+
+    function updateLockedTime(address target, uint256 duration) external onlyOwner returns (bool) {
+        lockedTime[target] = block.timestamp + duration * 1 days;
+        return true;
+    }
+
+    function getLockedReason(address target) external view returns (string memory) {
+        return lockedReason[target];
+    }
+
+    function getLockedAmount(address target) external view returns (uint256) {
+        return lockedAmount[target];
+    }
+
+    function getLockedTime(address target) external view returns (uint256) {
+        return lockedTime[target];
     }
 }
