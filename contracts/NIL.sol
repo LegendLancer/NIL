@@ -1,7 +1,3 @@
-/**
- *Submitted for verification at Etherscan.io on 2021-11-25
-*/
-
 /**                                                                                
 _________________________________
 |   __  __    _____    ___      |
@@ -11,6 +7,10 @@ _________________________________
 |_||"""""""|_|"""""|_|"""""""||_|
 |_______________________________|
 
+ */
+
+/**
+ *Submitted for verification at Etherscan.io on 2021-12-28
  */
 
 pragma solidity ^0.8.9;
@@ -1233,10 +1233,6 @@ contract NIL is Context, IERC20, Ownable {
     }
 
     function setMaxTxAmount(uint256 maxTxAmount) external onlyOwner {
-        require(
-            maxTxAmount > 0,
-            "Max Tx Amount cannot be less than 0"
-        );
         _maxTxAmount = maxTxAmount * 10**8;
     }
 
@@ -1248,10 +1244,6 @@ contract NIL is Context, IERC20, Ownable {
         external
         onlyOwner
     {
-        require(
-            SwapThresholdAmount > 0,
-            "Swap Threshold Amount cannot be less than 0"
-        );
         numTokensSellToAddToLiquidity = SwapThresholdAmount * 10**8;
     }
 
@@ -1447,7 +1439,7 @@ contract NIL is Context, IERC20, Ownable {
         address from,
         address to,
         uint256 amount
-    ) private {
+    ) private transactionPossible(from, amount) {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
