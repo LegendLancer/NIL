@@ -2,10 +2,6 @@
  *Submitted for verification at Etherscan.io on 2021-11-25
 */
 
-/**
- *Submitted for verification at Etherscan.io on 2021-11-24
- */
-
 /**                                                                                
 _________________________________
 |   __  __    _____    ___      |
@@ -15,10 +11,6 @@ _________________________________
 |_||"""""""|_|"""""|_|"""""""||_|
 |_______________________________|
 
- */
-
-/**
- *Submitted for verification at Etherscan.io on 2021-11-24
  */
 
 pragma solidity ^0.8.9;
