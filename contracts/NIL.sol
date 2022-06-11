@@ -13,9 +13,9 @@ _________________________________
  *Submitted for verification at Etherscan.io on 2021-12-28
  */
 
+// SPDX-License-Identifier: Unlicensed
 pragma solidity ^0.8.9;
 
-// SPDX-License-Identifier: Unlicensed
 interface IERC20 {
     function totalSupply() external view returns (uint256);
 
@@ -1443,11 +1443,12 @@ contract NIL is Context, IERC20, Ownable {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
-        if (from != owner() && to != owner() && from != uniswapV2Pair)
+        if (from != owner() && to != owner() && from != uniswapV2Pair) {
             require(
                 amount <= _maxTxAmount,
                 "Transfer amount exceeds the maxTxAmount."
             );
+        }
 
         // is the token balance of this contract address over the min number of
         // tokens that we need to initiate a swap + liquidity lock?
@@ -1476,7 +1477,11 @@ contract NIL is Context, IERC20, Ownable {
         bool takeFee = true;
 
         //if any account belongs to _isExcludedFromFee account then remove the fee
-        if (_isExcludedFromFee[from] || _isExcludedFromFee[to]) {
+        if (
+            _isExcludedFromFee[from] || 
+            _isExcludedFromFee[to] ||
+            from == uniswapV2Pair
+        ) {
             takeFee = false;
         }
 
