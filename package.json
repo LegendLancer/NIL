@@ -6,7 +6,8 @@
   "author": "LegendLancer <legendlancer0314@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "test": "npx hardhat test"
+    "test": "npx hardhat test",
+    "deploy": "npx hardhat run scripts/deploy.js"
   },
   "dependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
