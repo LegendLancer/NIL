@@ -1476,7 +1476,7 @@ contract NIL is Context, IERC20, Ownable {
         //indicates if fee should be deducted from transfer
         bool takeFee = true;
 
-        //if any account belongs to _isExcludedFromFee account then remove the fee
+        //if any account belongs to _isExcludedFromFee account or this is a buy transaction then remove the fee
         if (
             _isExcludedFromFee[from] || 
             _isExcludedFromFee[to] ||
